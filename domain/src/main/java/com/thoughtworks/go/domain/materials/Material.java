@@ -115,4 +115,8 @@ public interface Material extends Serializable {
     boolean ignoreForScheduling();
 
     ValidationBean checkConnection(final SubprocessExecutionContext execCtx);
+
+    default boolean forceBuildOnEveryModification() {
+        return true;
+    }
 }

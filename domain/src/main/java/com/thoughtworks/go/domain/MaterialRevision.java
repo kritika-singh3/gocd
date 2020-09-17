@@ -29,6 +29,7 @@ import java.util.*;
 
 import static com.thoughtworks.go.util.ExceptionUtils.*;
 import static java.lang.String.format;
+import static java.util.Collections.singletonList;
 
 public class MaterialRevision implements Serializable {
     private Material material;
@@ -173,7 +174,12 @@ public class MaterialRevision implements Serializable {
             materialRevision.markAsNotChanged();
             return materialRevision;
         } else {
-            MaterialRevision materialRevision = new MaterialRevision(newMaterial, newModifications);
+            MaterialRevision materialRevision = new MaterialRevision(newMaterial);
+            if (newMaterial.forceBuildOnEveryModification()) {
+                materialRevision.replaceModifications(singletonList(newModifications.get(newModifications.size() - 1)));
+            } else {
+                materialRevision.replaceModifications(newModifications);
+            }
             materialRevision.markAsChanged();
             return materialRevision;
         }
@@ -245,9 +251,9 @@ public class MaterialRevision implements Serializable {
     public void populateEnvironmentVariables(EnvironmentVariableContext context, File workingDir) {
         material.populateEnvironmentContext(context, this, workingDir);
         String materialNameForEnvironmentVariable = material.getMaterialNameForEnvironmentVariable();
-        if(StringUtils.isNotBlank(materialNameForEnvironmentVariable)){
+        if (StringUtils.isNotBlank(materialNameForEnvironmentVariable)) {
             context.setPropertyWithEscape(format("GO_MATERIAL_%s_HAS_CHANGED", materialNameForEnvironmentVariable), Boolean.toString(isChanged()));
-        }else {
+        } else {
             context.setPropertyWithEscape("GO_MATERIAL_HAS_CHANGED", Boolean.toString(isChanged()));
         }
     }
