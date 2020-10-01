@@ -15,14 +15,13 @@
  */
 package com.thoughtworks.go.plugin.access.scm;
 
-import com.thoughtworks.go.plugin.access.DefaultPluginInteractionCallback;
 import com.thoughtworks.go.plugin.access.ExtensionsRegistry;
 import com.thoughtworks.go.plugin.access.PluginRequestHelper;
 import com.thoughtworks.go.plugin.access.common.AbstractExtension;
-import com.thoughtworks.go.plugin.access.common.settings.PluginSettingsJsonMessageHandler;
 import com.thoughtworks.go.plugin.access.common.settings.PluginSettingsJsonMessageHandler1_0;
 import com.thoughtworks.go.plugin.access.scm.material.MaterialPollResult;
 import com.thoughtworks.go.plugin.access.scm.revision.SCMRevision;
+import com.thoughtworks.go.plugin.access.scm.v1.SCMExtensionV1;
 import com.thoughtworks.go.plugin.api.response.Result;
 import com.thoughtworks.go.plugin.api.response.validation.ValidationResult;
 import com.thoughtworks.go.plugin.infra.PluginManager;
@@ -34,129 +33,56 @@ import java.util.List;
 import java.util.Map;
 
 import static com.thoughtworks.go.plugin.domain.common.PluginConstants.SCM_EXTENSION;
-import static java.util.Arrays.asList;
+import static java.util.Collections.singletonList;
 
 @Component
 public class SCMExtension extends AbstractExtension {
-    private static final List<String> goSupportedVersions = asList("1.0");
+    public static final List<String> SCM_SUPPORTED_VERSIONS = singletonList(SCMExtensionV1.VERSION);
 
-    public static final String REQUEST_SCM_CONFIGURATION = "scm-configuration";
-    public static final String REQUEST_SCM_VIEW = "scm-view";
-    public static final String REQUEST_VALIDATE_SCM_CONFIGURATION = "validate-scm-configuration";
-    public static final String REQUEST_CHECK_SCM_CONNECTION = "check-scm-connection";
-    public static final String REQUEST_LATEST_REVISION = "latest-revision";
-    public static final String REQUEST_LATEST_REVISIONS_SINCE = "latest-revisions-since";
-    public static final String REQUEST_CHECKOUT = "checkout";
-
-    private Map<String, JsonMessageHandler> messageHandlerMap = new HashMap<>();
+    private Map<String, VersionedSCMExtension> scmExtensionMap = new HashMap<>();
 
     @Autowired
     public SCMExtension(PluginManager pluginManager, ExtensionsRegistry extensionsRegistry) {
-        super(pluginManager, extensionsRegistry, new PluginRequestHelper(pluginManager, goSupportedVersions, SCM_EXTENSION), SCM_EXTENSION);
+        super(pluginManager, extensionsRegistry, new PluginRequestHelper(pluginManager, SCM_SUPPORTED_VERSIONS, SCM_EXTENSION), SCM_EXTENSION);
+        scmExtensionMap.put("1.0", new SCMExtensionV1(pluginRequestHelper));
         registerHandler("1.0", new PluginSettingsJsonMessageHandler1_0());
-        messageHandlerMap.put("1.0", new JsonMessageHandler1_0());
     }
 
     public SCMPropertyConfiguration getSCMConfiguration(String pluginId) {
-        return pluginRequestHelper.submitRequest(pluginId, REQUEST_SCM_CONFIGURATION, new DefaultPluginInteractionCallback<SCMPropertyConfiguration>() {
-
-            @Override
-            public SCMPropertyConfiguration onSuccess(String responseBody, Map<String, String> responseHeaders, String resolvedExtensionVersion) {
-                return messageHandlerMap.get(resolvedExtensionVersion).responseMessageForSCMConfiguration(responseBody);
-            }
-        });
+        return getVersionedSCMExtension(pluginId).getSCMConfiguration(pluginId);
     }
 
     public SCMView getSCMView(String pluginId) {
-        return pluginRequestHelper.submitRequest(pluginId, REQUEST_SCM_VIEW, new DefaultPluginInteractionCallback<SCMView>() {
-
-            @Override
-            public SCMView onSuccess(String responseBody, Map<String, String> responseHeaders, String resolvedExtensionVersion) {
-                return messageHandlerMap.get(resolvedExtensionVersion).responseMessageForSCMView(responseBody);
-            }
-        });
+        return getVersionedSCMExtension(pluginId).getSCMView(pluginId);
     }
 
     public ValidationResult isSCMConfigurationValid(String pluginId, final SCMPropertyConfiguration scmConfiguration) {
-        return pluginRequestHelper.submitRequest(pluginId, REQUEST_VALIDATE_SCM_CONFIGURATION, new DefaultPluginInteractionCallback<ValidationResult>() {
-            @Override
-            public String requestBody(String resolvedExtensionVersion) {
-                return messageHandlerMap.get(resolvedExtensionVersion).requestMessageForIsSCMConfigurationValid(scmConfiguration);
-            }
-
-            @Override
-            public ValidationResult onSuccess(String responseBody, Map<String, String> responseHeaders, String resolvedExtensionVersion) {
-                return messageHandlerMap.get(resolvedExtensionVersion).responseMessageForIsSCMConfigurationValid(responseBody);
-            }
-        });
+        return getVersionedSCMExtension(pluginId).isSCMConfigurationValid(pluginId, scmConfiguration);
     }
 
     public Result checkConnectionToSCM(String pluginId, final SCMPropertyConfiguration scmConfiguration) {
-        return pluginRequestHelper.submitRequest(pluginId, REQUEST_CHECK_SCM_CONNECTION, new DefaultPluginInteractionCallback<Result>() {
-            @Override
-            public String requestBody(String resolvedExtensionVersion) {
-                return messageHandlerMap.get(resolvedExtensionVersion).requestMessageForCheckConnectionToSCM(scmConfiguration);
-            }
-
-            @Override
-            public Result onSuccess(String responseBody, Map<String, String> responseHeaders, String resolvedExtensionVersion) {
-                return messageHandlerMap.get(resolvedExtensionVersion).responseMessageForCheckConnectionToSCM(responseBody);
-            }
-        });
+        return getVersionedSCMExtension(pluginId).checkConnectionToSCM(pluginId, scmConfiguration);
     }
 
     public MaterialPollResult getLatestRevision(String pluginId, final SCMPropertyConfiguration scmConfiguration, final Map<String, String> materialData, final String flyweightFolder) {
-        return pluginRequestHelper.submitRequest(pluginId, REQUEST_LATEST_REVISION, new DefaultPluginInteractionCallback<MaterialPollResult>() {
-            @Override
-            public String requestBody(String resolvedExtensionVersion) {
-                return messageHandlerMap.get(resolvedExtensionVersion).requestMessageForLatestRevision(scmConfiguration, materialData, flyweightFolder);
-            }
-
-            @Override
-            public MaterialPollResult onSuccess(String responseBody, Map<String, String> responseHeaders, String resolvedExtensionVersion) {
-                return messageHandlerMap.get(resolvedExtensionVersion).responseMessageForLatestRevision(responseBody);
-            }
-        });
+        return getVersionedSCMExtension(pluginId).getLatestRevision(pluginId, scmConfiguration, materialData, flyweightFolder);
     }
 
     public MaterialPollResult latestModificationSince(String pluginId, final SCMPropertyConfiguration scmConfiguration, final Map<String, String> materialData, final String flyweightFolder, final SCMRevision previouslyKnownRevision) {
-        return pluginRequestHelper.submitRequest(pluginId, REQUEST_LATEST_REVISIONS_SINCE, new DefaultPluginInteractionCallback<MaterialPollResult>() {
-            @Override
-            public String requestBody(String resolvedExtensionVersion) {
-                return messageHandlerMap.get(resolvedExtensionVersion).requestMessageForLatestRevisionsSince(scmConfiguration, materialData, flyweightFolder, previouslyKnownRevision);
-            }
-
-            @Override
-            public MaterialPollResult onSuccess(String responseBody, Map<String, String> responseHeaders, String resolvedExtensionVersion) {
-                return messageHandlerMap.get(resolvedExtensionVersion).responseMessageForLatestRevisionsSince(responseBody);
-            }
-        });
+        return getVersionedSCMExtension(pluginId).latestModificationSince(pluginId, scmConfiguration, materialData, flyweightFolder, previouslyKnownRevision);
     }
 
     public Result checkout(String pluginId, final SCMPropertyConfiguration scmConfiguration, final String destinationFolder, final SCMRevision revision) {
-        return pluginRequestHelper.submitRequest(pluginId, SCMExtension.REQUEST_CHECKOUT, new DefaultPluginInteractionCallback<Result>() {
-            @Override
-            public String requestBody(String resolvedExtensionVersion) {
-                return messageHandlerMap.get(resolvedExtensionVersion).requestMessageForCheckout(scmConfiguration, destinationFolder, revision);
-            }
-
-            @Override
-            public Result onSuccess(String responseBody, Map<String, String> responseHeaders, String resolvedExtensionVersion) {
-                return messageHandlerMap.get(resolvedExtensionVersion).responseMessageForCheckout(responseBody);
-            }
-        });
-    }
-
-    Map<String, PluginSettingsJsonMessageHandler> getPluginSettingsMessageHandlerMap() {
-        return pluginSettingsMessageHandlerMap;
-    }
-
-    Map<String, JsonMessageHandler> getMessageHandlerMap() {
-        return messageHandlerMap;
+        return getVersionedSCMExtension(pluginId).checkout(pluginId, scmConfiguration, destinationFolder, revision);
     }
 
     @Override
     public List<String> goSupportedVersions() {
-        return goSupportedVersions;
+        return SCM_SUPPORTED_VERSIONS;
+    }
+
+    VersionedSCMExtension getVersionedSCMExtension(String pluginId) {
+        final String resolvedExtensionVersion = pluginManager.resolveExtensionVersion(pluginId, SCM_EXTENSION, goSupportedVersions());
+        return scmExtensionMap.get(resolvedExtensionVersion);
     }
 }

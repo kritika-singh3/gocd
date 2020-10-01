@@ -13,11 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.thoughtworks.go.plugin.access.scm;
+package com.thoughtworks.go.plugin.access.scm.v1;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.thoughtworks.go.plugin.access.common.handler.JSONResultMessageHandler;
+import com.thoughtworks.go.plugin.access.scm.SCMProperty;
+import com.thoughtworks.go.plugin.access.scm.SCMPropertyConfiguration;
+import com.thoughtworks.go.plugin.access.scm.SCMView;
 import com.thoughtworks.go.plugin.access.scm.material.MaterialPollResult;
 import com.thoughtworks.go.plugin.access.scm.revision.ModifiedAction;
 import com.thoughtworks.go.plugin.access.scm.revision.ModifiedFile;
@@ -33,16 +36,15 @@ import java.util.*;
 import static java.lang.String.format;
 import static org.apache.commons.lang3.StringUtils.isEmpty;
 
-public class JsonMessageHandler1_0 implements JsonMessageHandler {
+public class SCMExtensionConverterV1 {
     private static final String DATE_PATTERN = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'";
 
     private final JSONResultMessageHandler jsonResultMessageHandler;
 
-    public JsonMessageHandler1_0() {
+    public SCMExtensionConverterV1() {
         jsonResultMessageHandler = new JSONResultMessageHandler();
     }
 
-    @Override
     public SCMPropertyConfiguration responseMessageForSCMConfiguration(String responseBody) {
         try {
             SCMPropertyConfiguration scmConfiguration = new SCMPropertyConfiguration();
@@ -70,7 +72,6 @@ public class JsonMessageHandler1_0 implements JsonMessageHandler {
         }
     }
 
-    @Override
     public SCMView responseMessageForSCMView(String responseBody) {
         try {
             final Map map = parseResponseToMap(responseBody);
@@ -117,31 +118,26 @@ public class JsonMessageHandler1_0 implements JsonMessageHandler {
         }
     }
 
-    @Override
     public String requestMessageForIsSCMConfigurationValid(SCMPropertyConfiguration scmConfiguration) {
         Map configuredValues = new LinkedHashMap();
         configuredValues.put("scm-configuration", jsonResultMessageHandler.configurationToMap(scmConfiguration));
         return toJsonString(configuredValues);
     }
 
-    @Override
     public ValidationResult responseMessageForIsSCMConfigurationValid(String responseBody) {
         return jsonResultMessageHandler.toValidationResult(responseBody);
     }
 
-    @Override
     public String requestMessageForCheckConnectionToSCM(SCMPropertyConfiguration scmConfiguration) {
         Map configuredValues = new LinkedHashMap();
         configuredValues.put("scm-configuration", jsonResultMessageHandler.configurationToMap(scmConfiguration));
         return toJsonString(configuredValues);
     }
 
-    @Override
     public Result responseMessageForCheckConnectionToSCM(String responseBody) {
         return jsonResultMessageHandler.toResult(responseBody);
     }
 
-    @Override
     public String requestMessageForLatestRevision(SCMPropertyConfiguration scmConfiguration, Map<String, String> materialData, String flyweightFolder) {
         Map configuredValues = new LinkedHashMap();
         configuredValues.put("scm-configuration", jsonResultMessageHandler.configurationToMap(scmConfiguration));
@@ -150,13 +146,11 @@ public class JsonMessageHandler1_0 implements JsonMessageHandler {
         return toJsonString(configuredValues);
     }
 
-    @Override
     public MaterialPollResult responseMessageForLatestRevision(String responseBody) {
         Map responseBodyMap = getResponseMap(responseBody);
         return new MaterialPollResult(toMaterialDataMap(responseBodyMap), toSCMRevision(responseBodyMap));
     }
 
-    @Override
     public String requestMessageForLatestRevisionsSince(SCMPropertyConfiguration scmConfiguration, Map<String, String> materialData, String flyweightFolder, SCMRevision previousRevision) {
         Map configuredValues = new LinkedHashMap();
         configuredValues.put("scm-configuration", jsonResultMessageHandler.configurationToMap(scmConfiguration));
@@ -166,14 +160,12 @@ public class JsonMessageHandler1_0 implements JsonMessageHandler {
         return toJsonString(configuredValues);
     }
 
-    @Override
     public MaterialPollResult responseMessageForLatestRevisionsSince(String responseBody) {
         if (isEmpty(responseBody)) return new MaterialPollResult();
         Map responseBodyMap = getResponseMap(responseBody);
         return new MaterialPollResult(toMaterialDataMap(responseBodyMap), toSCMRevisions(responseBodyMap));
     }
 
-    @Override
     public String requestMessageForCheckout(SCMPropertyConfiguration scmConfiguration, String destinationFolder, SCMRevision revision) {
         Map configuredValues = new LinkedHashMap();
         configuredValues.put("scm-configuration", jsonResultMessageHandler.configurationToMap(scmConfiguration));
@@ -182,7 +174,6 @@ public class JsonMessageHandler1_0 implements JsonMessageHandler {
         return toJsonString(configuredValues);
     }
 
-    @Override
     public Result responseMessageForCheckout(String responseBody) {
         return jsonResultMessageHandler.toResult(responseBody);
     }
