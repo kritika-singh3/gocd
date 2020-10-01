@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.thoughtworks.go.plugin.access.scm.v1;
+package com.thoughtworks.go.plugin.access.scm.v2;
 
 import com.thoughtworks.go.plugin.access.PluginRequestHelper;
 import com.thoughtworks.go.plugin.access.scm.SCMProperty;
@@ -41,18 +41,17 @@ import java.util.List;
 
 import static com.thoughtworks.go.plugin.access.scm.v1.SCMPluginConstantsV1.*;
 import static com.thoughtworks.go.plugin.domain.common.PluginConstants.SCM_EXTENSION;
-import static java.util.Collections.*;
+import static java.util.Collections.emptyMap;
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.initMocks;
 
-class SCMExtensionV1Test {
+class SCMExtensionV2Test {
     private static final String DATE_FORMAT = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'";
     private static final String PLUGIN_ID = "cd.go.example.plugin";
-    private SCMExtensionV1 scmExtension;
+    private SCMExtensionV2 scmExtension;
     @Mock
     private PluginManager pluginManager;
     @Mock
@@ -62,16 +61,16 @@ class SCMExtensionV1Test {
     @BeforeEach
     void setUp() {
         initMocks(this);
-        final List<String> goSupportedVersions = singletonList("1.0");
+        final List<String> goSupportedVersions = singletonList(SCMExtensionV2.VERSION);
 
         requestArgumentCaptor = ArgumentCaptor.forClass(GoPluginApiRequest.class);
         when(descriptor.id()).thenReturn(PLUGIN_ID);
         when(pluginManager.getPluginDescriptorFor(PLUGIN_ID)).thenReturn(descriptor);
         when(pluginManager.isPluginOfType(SCM_EXTENSION, PLUGIN_ID)).thenReturn(true);
-        when(pluginManager.resolveExtensionVersion(PLUGIN_ID, SCM_EXTENSION, goSupportedVersions)).thenReturn("1.0");
+        when(pluginManager.resolveExtensionVersion(PLUGIN_ID, SCM_EXTENSION, goSupportedVersions)).thenReturn(SCMExtensionV2.VERSION);
 
         final PluginRequestHelper pluginRequestHelper = new PluginRequestHelper(pluginManager, goSupportedVersions, SCM_EXTENSION);
-        scmExtension = new SCMExtensionV1(pluginRequestHelper);
+        scmExtension = new SCMExtensionV2(pluginRequestHelper);
     }
 
     @Test
@@ -187,24 +186,32 @@ class SCMExtensionV1Test {
     }
 
     @Test
-    void shouldNotTalkToPluginForGetCapabilities() {
+    void shouldTalkToPluginForGetCapabilities() {
+        String responseBody = "{\"supported_webhooks\": []}";
+        when(pluginManager.submitTo(eq(PLUGIN_ID), eq(SCM_EXTENSION), requestArgumentCaptor.capture())).thenReturn(DefaultGoPluginApiResponse.success(responseBody));
+
         Capabilities capabilities = scmExtension.getCapabilities(PLUGIN_ID);
 
-        verifyNoInteractions(pluginManager);
-        assertThat(capabilities).isNull();
+        assertRequest(requestArgumentCaptor.getValue(), SCMPluginConstantsV2.GET_CAPABILITIES, null);
+        assertThat(capabilities).isNotNull();
+        assertThat(capabilities.getSupportedWebhooks()).isEmpty();
     }
 
     @Test
-    void shouldThrowExceptionForShouldUpdate() {
-        assertThatCode(() -> scmExtension.shouldUpdate(PLUGIN_ID, "Github", "pull", "some-payload", emptyList()))
-                .isInstanceOf(UnsupportedOperationException.class)
-                .hasMessage("Plugin: 'cd.go.example.plugin' uses scm extension v1 and shouldUpdate calls are not supported by scm V1");
-        verifyNoInteractions(pluginManager);
+    void shouldTalkToPluginForShouldUpdate() {
+        String responseBody = "[]";
+        when(pluginManager.submitTo(eq(PLUGIN_ID), eq(SCM_EXTENSION), requestArgumentCaptor.capture())).thenReturn(DefaultGoPluginApiResponse.success(responseBody));
+        SCMPropertyConfiguration scmPropertyConfiguration = new SCMPropertyConfiguration();
+        scmPropertyConfiguration.add(new SCMProperty("key-one", "value-one"));
+
+        List<SCMPropertyConfiguration> configurations = scmExtension.shouldUpdate(PLUGIN_ID, "Github", "pull", "some-payload", singletonList(scmPropertyConfiguration));
+        assertRequest(requestArgumentCaptor.getValue(), SCMPluginConstantsV2.SHOULD_UPDATE, "{\"provider\":\"Github\",\"event_type\":\"pull\",\"event_payload\":\"some-payload\",\"materials\":[{\"key-one\":{\"value\":\"value-one\"}}]}");
+        assertThat(configurations).isEmpty();
     }
 
     private void assertRequest(GoPluginApiRequest goPluginApiRequest, String requestName, String requestBody) {
         assertThat(goPluginApiRequest.extension()).isEqualTo(SCM_EXTENSION);
-        assertThat(goPluginApiRequest.extensionVersion()).isEqualTo("1.0");
+        assertThat(goPluginApiRequest.extensionVersion()).isEqualTo(SCMExtensionV2.VERSION);
         assertThat(goPluginApiRequest.requestName()).isEqualTo(requestName);
         assertThat(goPluginApiRequest.requestBody()).isEqualTo(requestBody);
     }

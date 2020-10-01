@@ -34,6 +34,7 @@ import com.thoughtworks.go.plugin.domain.authorization.AuthorizationPluginInfo;
 import com.thoughtworks.go.plugin.domain.common.*;
 import com.thoughtworks.go.plugin.domain.elastic.ElasticAgentPluginInfo;
 import com.thoughtworks.go.plugin.domain.notification.NotificationPluginInfo;
+import com.thoughtworks.go.plugin.domain.scm.Capabilities;
 import com.thoughtworks.go.plugin.domain.scm.SCMPluginInfo;
 import com.thoughtworks.go.plugin.infra.PluginManager;
 import com.thoughtworks.go.plugin.infra.plugininfo.GoPluginDescriptor;
@@ -312,7 +313,7 @@ public class PluginServiceTest {
         GoPluginDescriptor pluginDescriptor = GoPluginDescriptor.builder().id(pluginId).build();
         NotificationPluginInfo notificationPluginInfo = new NotificationPluginInfo(pluginDescriptor, null);
         combinedPluginInfo.add(notificationPluginInfo);
-        SCMPluginInfo scmPluginInfo = new SCMPluginInfo(pluginDescriptor, "display_name", new PluggableInstanceSettings(null), null);
+        SCMPluginInfo scmPluginInfo = new SCMPluginInfo(pluginDescriptor, "display_name", new PluggableInstanceSettings(null), null, new Capabilities());
         combinedPluginInfo.add(scmPluginInfo);
 
         when(elasticAgentExtension.canHandlePlugin(pluginId)).thenReturn(true);

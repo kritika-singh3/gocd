@@ -19,29 +19,31 @@ import com.thoughtworks.go.plugin.access.common.settings.PluginSettingsConfigura
 import com.thoughtworks.go.plugin.access.common.settings.PluginSettingsProperty;
 import com.thoughtworks.go.plugin.api.config.Property;
 import com.thoughtworks.go.plugin.domain.common.*;
+import com.thoughtworks.go.plugin.domain.scm.Capabilities;
 import com.thoughtworks.go.plugin.domain.scm.SCMPluginInfo;
 import com.thoughtworks.go.plugin.infra.plugininfo.GoPluginDescriptor;
-import org.junit.Before;
 import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.migrationsupport.rules.EnableRuleMigrationSupport;
 import org.junit.rules.ExpectedException;
 
-import java.util.Arrays;
 import java.util.List;
 
-import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static java.util.Arrays.asList;
+import static java.util.Collections.singletonList;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.*;
 
+@EnableRuleMigrationSupport
 public class SCMPluginInfoBuilderTest {
     private SCMExtension extension;
 
     @Rule
     public ExpectedException thrown = ExpectedException.none();
 
-    @Before
-    public void setUp() throws Exception {
+    @BeforeEach
+    void setUp() throws Exception {
         extension = mock(SCMExtension.class);
 
         SCMPropertyConfiguration value = new SCMPropertyConfiguration();
@@ -66,28 +68,28 @@ public class SCMPluginInfoBuilderTest {
     }
 
     @Test
-    public void shouldBuildPluginInfo() throws Exception {
+    void shouldBuildPluginInfo() throws Exception {
         GoPluginDescriptor descriptor = GoPluginDescriptor.builder().id("plugin1").build();
 
         SCMPluginInfo pluginInfo = new SCMPluginInfoBuilder(extension).pluginInfoFor(descriptor);
 
-        List<PluginConfiguration> scmConfigurations = Arrays.asList(
+        List<PluginConfiguration> scmConfigurations = asList(
                 new PluginConfiguration("username", new MetadataWithPartOfIdentity(true, false, true)),
                 new PluginConfiguration("password", new MetadataWithPartOfIdentity(true, true, false))
         );
         PluginView pluginView = new PluginView("some html");
-        List<PluginConfiguration> pluginSettings = Arrays.asList(new PluginConfiguration("k1", new Metadata(true, false)));
+        List<PluginConfiguration> pluginSettings = singletonList(new PluginConfiguration("k1", new Metadata(true, false)));
 
-        assertThat(pluginInfo.getDescriptor(), is(descriptor));
-        assertThat(pluginInfo.getExtensionName(), is("scm"));
-        assertThat(pluginInfo.getDisplayName(), is("some scm plugin"));
-        assertThat(pluginInfo.getScmSettings(), is(new PluggableInstanceSettings(scmConfigurations, pluginView)));
-        assertThat(pluginInfo.getPluginSettings(), is(new PluggableInstanceSettings(pluginSettings, new PluginView("settings view"))));
+        assertThat(pluginInfo.getDescriptor()).isEqualTo(descriptor);
+        assertThat(pluginInfo.getExtensionName()).isEqualTo("scm");
+        assertThat(pluginInfo.getDisplayName()).isEqualTo("some scm plugin");
+        assertThat(pluginInfo.getScmSettings()).isEqualTo(new PluggableInstanceSettings(scmConfigurations, pluginView));
+        assertThat(pluginInfo.getPluginSettings()).isEqualTo(new PluggableInstanceSettings(pluginSettings, new PluginView("settings view")));
 
     }
 
     @Test
-    public void shouldThrowAnExceptionIfScmConfigReturnedByPluginIsNull() {
+    void shouldThrowAnExceptionIfScmConfigReturnedByPluginIsNull() {
         GoPluginDescriptor descriptor = GoPluginDescriptor.builder().id("plugin1").build();
         when(extension.getSCMConfiguration("plugin1")).thenReturn(null);
         thrown.expectMessage("Plugin[plugin1] returned null scm configuration");
@@ -95,10 +97,21 @@ public class SCMPluginInfoBuilderTest {
     }
 
     @Test
-    public void shouldThrowAnExceptionIfScmViewReturnedByPluginIsNull() {
+    void shouldThrowAnExceptionIfScmViewReturnedByPluginIsNull() {
         GoPluginDescriptor descriptor = GoPluginDescriptor.builder().id("plugin1").build();
         when(extension.getSCMView("plugin1")).thenReturn(null);
         thrown.expectMessage("Plugin[plugin1] returned null scm view");
         new SCMPluginInfoBuilder(extension).pluginInfoFor(descriptor);
+    }
+
+    @Test
+    void shouldMakeACallToGetCapabilities() {
+        Capabilities capabilities = new Capabilities();
+        when(extension.getCapabilities(anyString())).thenReturn(capabilities);
+        GoPluginDescriptor descriptor = GoPluginDescriptor.builder().id("plugin1").build();
+        SCMPluginInfo scmPluginInfo = new SCMPluginInfoBuilder(extension).pluginInfoFor(descriptor);
+
+        verify(extension).getCapabilities("plugin1");
+        assertThat(scmPluginInfo.getCapabilities()).isEqualTo(capabilities);
     }
 }

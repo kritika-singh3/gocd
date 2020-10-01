@@ -28,12 +28,15 @@ import com.thoughtworks.go.plugin.domain.notification.NotificationPluginInfo;
 import com.thoughtworks.go.plugin.domain.packagematerial.PackageMaterialPluginInfo;
 import com.thoughtworks.go.plugin.domain.pluggabletask.PluggableTaskPluginInfo;
 import com.thoughtworks.go.plugin.domain.scm.SCMPluginInfo;
+import com.thoughtworks.go.plugin.domain.scm.WebhookSupport;
 import com.thoughtworks.go.plugin.domain.secrets.SecretsPluginInfo;
 import com.thoughtworks.go.plugin.infra.plugininfo.GoPluginBundleDescriptor;
 import com.thoughtworks.go.plugin.infra.plugininfo.GoPluginDescriptor;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import static java.util.Collections.singletonList;
 
 public class PluginInfoMother {
     public static SecretsPluginInfo createSecretConfigPluginInfo() {
@@ -63,11 +66,11 @@ public class PluginInfoMother {
     }
 
     public static SCMPluginInfo createSCMPluginInfo() {
-
+        WebhookSupport webhookSupport = new WebhookSupport().setProvider("Github").setEvents(singletonList("pull"));
         ArrayList<PluginConfiguration> configurations = new ArrayList<>();
         PluginConfiguration pluginConfiguration1 = new PluginConfiguration("key1", new MetadataWithPartOfIdentity(true, false, true));
         configurations.add(pluginConfiguration1);
-        return new SCMPluginInfo(getGoPluginDescriptor(), "SCM", new PluggableInstanceSettings(configurations, new PluginView("Template")), null);
+        return new SCMPluginInfo(getGoPluginDescriptor(), "SCM", new PluggableInstanceSettings(configurations, new PluginView("Template")), null, new com.thoughtworks.go.plugin.domain.scm.Capabilities().setSupportedWebhooks(singletonList(webhookSupport)));
     }
 
     public static ConfigRepoPluginInfo createConfigRepoPluginInfo() {

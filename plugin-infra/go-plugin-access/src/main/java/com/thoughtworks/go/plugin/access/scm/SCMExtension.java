@@ -22,8 +22,10 @@ import com.thoughtworks.go.plugin.access.common.settings.PluginSettingsJsonMessa
 import com.thoughtworks.go.plugin.access.scm.material.MaterialPollResult;
 import com.thoughtworks.go.plugin.access.scm.revision.SCMRevision;
 import com.thoughtworks.go.plugin.access.scm.v1.SCMExtensionV1;
+import com.thoughtworks.go.plugin.access.scm.v2.SCMExtensionV2;
 import com.thoughtworks.go.plugin.api.response.Result;
 import com.thoughtworks.go.plugin.api.response.validation.ValidationResult;
+import com.thoughtworks.go.plugin.domain.scm.Capabilities;
 import com.thoughtworks.go.plugin.infra.PluginManager;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -33,19 +35,22 @@ import java.util.List;
 import java.util.Map;
 
 import static com.thoughtworks.go.plugin.domain.common.PluginConstants.SCM_EXTENSION;
-import static java.util.Collections.singletonList;
+import static java.util.Arrays.asList;
 
 @Component
 public class SCMExtension extends AbstractExtension {
-    public static final List<String> SCM_SUPPORTED_VERSIONS = singletonList(SCMExtensionV1.VERSION);
+    public static final List<String> SCM_SUPPORTED_VERSIONS = asList(SCMExtensionV1.VERSION, SCMExtensionV2.VERSION);
 
     private Map<String, VersionedSCMExtension> scmExtensionMap = new HashMap<>();
 
     @Autowired
     public SCMExtension(PluginManager pluginManager, ExtensionsRegistry extensionsRegistry) {
         super(pluginManager, extensionsRegistry, new PluginRequestHelper(pluginManager, SCM_SUPPORTED_VERSIONS, SCM_EXTENSION), SCM_EXTENSION);
-        scmExtensionMap.put("1.0", new SCMExtensionV1(pluginRequestHelper));
-        registerHandler("1.0", new PluginSettingsJsonMessageHandler1_0());
+        scmExtensionMap.put(SCMExtensionV1.VERSION, new SCMExtensionV1(pluginRequestHelper));
+        scmExtensionMap.put(SCMExtensionV2.VERSION, new SCMExtensionV2(pluginRequestHelper));
+
+        registerHandler(SCMExtensionV1.VERSION, new PluginSettingsJsonMessageHandler1_0());
+        registerHandler(SCMExtensionV2.VERSION, new PluginSettingsJsonMessageHandler1_0());
     }
 
     public SCMPropertyConfiguration getSCMConfiguration(String pluginId) {
@@ -74,6 +79,14 @@ public class SCMExtension extends AbstractExtension {
 
     public Result checkout(String pluginId, final SCMPropertyConfiguration scmConfiguration, final String destinationFolder, final SCMRevision revision) {
         return getVersionedSCMExtension(pluginId).checkout(pluginId, scmConfiguration, destinationFolder, revision);
+    }
+
+    public Capabilities getCapabilities(String pluginId) {
+        return getVersionedSCMExtension(pluginId).getCapabilities(pluginId);
+    }
+
+    public List<SCMPropertyConfiguration> shouldUpdate(String pluginId, String provider, String eventType, String eventPayload, List<SCMPropertyConfiguration> materialsConfigured) {
+        return getVersionedSCMExtension(pluginId).shouldUpdate(pluginId, provider, eventType, eventPayload, materialsConfigured);
     }
 
     @Override

@@ -20,15 +20,19 @@ import com.thoughtworks.go.plugin.domain.common.PluggableInstanceSettings;
 import com.thoughtworks.go.plugin.domain.common.PluginConstants;
 import com.thoughtworks.go.plugin.domain.common.PluginInfo;
 
+import java.util.Objects;
+
 public class SCMPluginInfo extends PluginInfo {
 
     private final String displayName;
     private final PluggableInstanceSettings scmSettings;
+    private final Capabilities capabilities;
 
-    public SCMPluginInfo(PluginDescriptor descriptor, String displayName, PluggableInstanceSettings scmSettings, PluggableInstanceSettings pluginSettings) {
+    public SCMPluginInfo(PluginDescriptor descriptor, String displayName, PluggableInstanceSettings scmSettings, PluggableInstanceSettings pluginSettings, Capabilities capabilities) {
         super(descriptor, PluginConstants.SCM_EXTENSION, pluginSettings, null);
         this.displayName = displayName;
         this.scmSettings = scmSettings;
+        this.capabilities = capabilities;
     }
 
     public String getDisplayName() {
@@ -39,23 +43,23 @@ public class SCMPluginInfo extends PluginInfo {
         return scmSettings;
     }
 
+    public Capabilities getCapabilities() {
+        return capabilities;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         if (!super.equals(o)) return false;
-
         SCMPluginInfo that = (SCMPluginInfo) o;
-
-        if (displayName != null ? !displayName.equals(that.displayName) : that.displayName != null) return false;
-        return scmSettings != null ? scmSettings.equals(that.scmSettings) : that.scmSettings == null;
+        return Objects.equals(displayName, that.displayName) &&
+                Objects.equals(scmSettings, that.scmSettings) &&
+                Objects.equals(capabilities, that.capabilities);
     }
 
     @Override
     public int hashCode() {
-        int result = super.hashCode();
-        result = 31 * result + (displayName != null ? displayName.hashCode() : 0);
-        result = 31 * result + (scmSettings != null ? scmSettings.hashCode() : 0);
-        return result;
+        return Objects.hash(super.hashCode(), displayName, scmSettings, capabilities);
     }
 }

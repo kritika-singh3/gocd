@@ -19,6 +19,7 @@ import com.thoughtworks.go.plugin.access.common.PluginInfoBuilder;
 import com.thoughtworks.go.plugin.api.config.Configuration;
 import com.thoughtworks.go.plugin.api.config.Property;
 import com.thoughtworks.go.plugin.domain.common.*;
+import com.thoughtworks.go.plugin.domain.scm.Capabilities;
 import com.thoughtworks.go.plugin.domain.scm.SCMPluginInfo;
 import com.thoughtworks.go.plugin.infra.plugininfo.GoPluginDescriptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,7 +54,7 @@ public class SCMPluginInfoBuilder implements PluginInfoBuilder<SCMPluginInfo> {
         }
 
         PluggableInstanceSettings scmSettings = new PluggableInstanceSettings(scmPluginConfigurations(scmConfiguration), new PluginView(scmView.template()));
-        return new SCMPluginInfo(descriptor, scmView.displayValue(), scmSettings, pluginSettingsAndView);
+        return new SCMPluginInfo(descriptor, scmView.displayValue(), scmSettings, pluginSettingsAndView, capabilities(descriptor.id()));
     }
 
     private List<PluginConfiguration> scmPluginConfigurations(Configuration config) {
@@ -64,6 +65,10 @@ public class SCMPluginInfoBuilder implements PluginInfoBuilder<SCMPluginInfo> {
             pluginConfigurations.add(new PluginConfiguration(property.getKey(), metadata));
         }
         return pluginConfigurations;
+    }
+
+    private Capabilities capabilities(String pluginId) {
+        return extension.getCapabilities(pluginId);
     }
 
 }
