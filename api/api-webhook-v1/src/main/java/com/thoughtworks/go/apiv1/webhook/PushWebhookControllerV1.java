@@ -18,7 +18,9 @@ package com.thoughtworks.go.apiv1.webhook;
 
 import com.thoughtworks.go.api.ApiController;
 import com.thoughtworks.go.api.ApiVersion;
+import com.thoughtworks.go.apiv1.webhook.request.WebhookRequest;
 import com.thoughtworks.go.apiv1.webhook.request.payload.push.PushPayload;
+import com.thoughtworks.go.apiv1.webhook.request.plugin.GitHubPluginRequest;
 import com.thoughtworks.go.apiv1.webhook.request.push.BitBucketCloudPushRequest;
 import com.thoughtworks.go.apiv1.webhook.request.push.BitBucketServerPushRequest;
 import com.thoughtworks.go.apiv1.webhook.request.push.GitHubPushRequest;
@@ -37,6 +39,7 @@ import spark.Response;
 
 import java.util.List;
 
+import static org.apache.commons.lang3.StringUtils.isBlank;
 import static spark.Spark.path;
 import static spark.Spark.post;
 
@@ -96,14 +99,26 @@ public class PushWebhookControllerV1 extends ApiController implements SparkSprin
     }
 
     protected String github(Request request, Response response) {
-        GitHubPushRequest push = new GitHubPushRequest(request);
-        push.validate(serverConfigService.getWebhookSecret());
+        String pluginId = request.queryParamOrDefault("PLUGIN_ID", null);
+        WebhookRequest webhookRequest = isBlank(pluginId)
+                ? new GitHubPushRequest(request)
+                : new GitHubPluginRequest(request);
+        webhookRequest.validate(serverConfigService.getWebhookSecret());
 
-        if ("ping".equals(push.event())) {
+        if ("ping".equals(webhookRequest.event())) {
             return renderMessage(response, HttpStatus.ACCEPTED.value(), PING_RESPONSE);
         }
 
-        return notify(response, push.webhookUrls(), push.getPayload());
+        if (isBlank(pluginId)) {
+            GitHubPushRequest pushRequest = (GitHubPushRequest) webhookRequest;
+            return notify(response, pushRequest.webhookUrls(), pushRequest.getPayload());
+        } else {
+            LOGGER.info("[WebHook] Noticed a git push for plugin {}.", pluginId);
+            if (materialUpdateService.updateGitMaterial(pluginId, "Github", webhookRequest.event(), webhookRequest.contents())) {
+                return renderMessage(response, HttpStatus.ACCEPTED.value(), "OK!");
+            }
+            return renderMessage(response, HttpStatus.ACCEPTED.value(), "No matching materials!");
+        }
     }
 
     private String notify(Response response, List<String> webhookUrls, PushPayload payload) {

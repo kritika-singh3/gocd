@@ -85,7 +85,7 @@ public class SCMExtension extends AbstractExtension {
         return getVersionedSCMExtension(pluginId).getCapabilities(pluginId);
     }
 
-    public List<SCMPropertyConfiguration> shouldUpdate(String pluginId, String provider, String eventType, String eventPayload, List<SCMPropertyConfiguration> materialsConfigured) {
+    public List<SCMMaterial> shouldUpdate(String pluginId, String provider, String eventType, String eventPayload, List<SCMMaterial> materialsConfigured) {
         return getVersionedSCMExtension(pluginId).shouldUpdate(pluginId, provider, eventType, eventPayload, materialsConfigured);
     }
 

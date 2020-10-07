@@ -18,6 +18,7 @@ package com.thoughtworks.go.plugin.access.scm.v2;
 
 import com.thoughtworks.go.plugin.access.DefaultPluginInteractionCallback;
 import com.thoughtworks.go.plugin.access.PluginRequestHelper;
+import com.thoughtworks.go.plugin.access.scm.SCMMaterial;
 import com.thoughtworks.go.plugin.access.scm.SCMPropertyConfiguration;
 import com.thoughtworks.go.plugin.access.scm.SCMView;
 import com.thoughtworks.go.plugin.access.scm.VersionedSCMExtension;
@@ -141,7 +142,7 @@ public class SCMExtensionV2 implements VersionedSCMExtension {
     }
 
     @Override
-    public List<SCMPropertyConfiguration> shouldUpdate(String pluginId, String provider, String eventType, String eventPayload, List<SCMPropertyConfiguration> materialsConfigured) {
+    public List<SCMMaterial> shouldUpdate(String pluginId, String provider, String eventType, String eventPayload, List<SCMMaterial> materialsConfigured) {
         return pluginRequestHelper.submitRequest(pluginId, SCMPluginConstantsV2.SHOULD_UPDATE, new DefaultPluginInteractionCallback<>() {
             @Override
             public String requestBody(String resolvedExtensionVersion) {
@@ -149,7 +150,7 @@ public class SCMExtensionV2 implements VersionedSCMExtension {
             }
 
             @Override
-            public List<SCMPropertyConfiguration> onSuccess(String responseBody, Map<String, String> responseHeaders, String resolvedExtensionVersion) {
+            public List<SCMMaterial> onSuccess(String responseBody, Map<String, String> responseHeaders, String resolvedExtensionVersion) {
                 return scmExtensionConverterV2.responseMessageForShouldUpdate(responseBody);
             }
         });

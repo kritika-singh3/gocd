@@ -17,10 +17,12 @@ package com.thoughtworks.go.server.service.materials;
 
 import com.thoughtworks.go.config.commands.EntityConfigUpdateCommand;
 import com.thoughtworks.go.config.exceptions.EntityType;
+import com.thoughtworks.go.config.materials.PluggableSCMMaterialConfig;
 import com.thoughtworks.go.config.update.CreateSCMConfigCommand;
 import com.thoughtworks.go.config.update.DeleteSCMConfigCommand;
 import com.thoughtworks.go.config.update.UpdateSCMConfigCommand;
 import com.thoughtworks.go.domain.config.ConfigurationProperty;
+import com.thoughtworks.go.domain.materials.MaterialConfig;
 import com.thoughtworks.go.domain.scm.SCM;
 import com.thoughtworks.go.domain.scm.SCMs;
 import com.thoughtworks.go.plugin.access.scm.*;
@@ -28,6 +30,7 @@ import com.thoughtworks.go.plugin.api.config.Property;
 import com.thoughtworks.go.plugin.api.response.Result;
 import com.thoughtworks.go.plugin.api.response.validation.ValidationError;
 import com.thoughtworks.go.plugin.api.response.validation.ValidationResult;
+import com.thoughtworks.go.plugin.domain.scm.SCMPluginInfo;
 import com.thoughtworks.go.server.domain.Username;
 import com.thoughtworks.go.server.service.EntityHashingService;
 import com.thoughtworks.go.server.service.GoConfigService;
@@ -39,8 +42,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+import java.util.Set;
+
 import static com.thoughtworks.go.i18n.LocalizedMessage.saveFailedWithReason;
 import static java.lang.String.format;
+import static java.util.Collections.emptySet;
+import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toSet;
 
 @Service
 public class PluggableScmService {
@@ -108,7 +117,6 @@ public class PluggableScmService {
         }
     }
 
-
     public SCMs listAllScms() {
         return goConfigService.getSCMs();
     }
@@ -158,6 +166,24 @@ public class PluggableScmService {
         }
     }
 
+    public Set<MaterialConfig> getMaterialsToUpdate(String pluginId, String provider, String eventType, String eventPayload, Set<PluggableSCMMaterialConfig> scmMaterialConfigs) {
+        SCMPluginInfo pluginInfo = NewSCMMetadataStore.instance().getPluginInfo(pluginId);
+        if (pluginInfo == null) {
+            LOGGER.debug("No plugin found for plugin id {}.", pluginId);
+            return emptySet();
+        }
+        boolean supportsWebhook = pluginInfo.getCapabilities().supportsWebhook(provider, eventType);
+        if (!supportsWebhook) {
+            LOGGER.debug("The SCM plugin '{}' does not support webhook integration for provider '{}' and event '{}'", pluginInfo.getDisplayName(), provider, eventType);
+            return emptySet();
+        }
+        List<SCMMaterial> materialsConfigured = scmMaterialConfigs.stream()
+                .map(scmConfig -> new SCMMaterial(scmConfig.getSCMConfig().getId(), getScmPropertyConfiguration(scmConfig.getSCMConfig())))
+                .collect(toList());
+        List<SCMMaterial> materialsToUpdate = scmExtension.shouldUpdate(pluginId, provider, eventType, eventPayload, materialsConfigured);
+        return getMaterialsToUpdate(scmMaterialConfigs, materialsToUpdate);
+    }
+
     private void update(Username currentUser, LocalizedOperationResult result, EntityConfigUpdateCommand command) {
         try {
             goConfigService.updateConfig(command, currentUser);
@@ -173,5 +199,15 @@ public class PluggableScmService {
             configuration.add(new SCMProperty(configurationProperty.getConfigurationKey().getName(), configurationProperty.getResolvedValue()));
         }
         return configuration;
+    }
+
+    private Set<MaterialConfig> getMaterialsToUpdate(Set<PluggableSCMMaterialConfig> scmMaterialConfigs, List<SCMMaterial> scmPropertyConfigurations) {
+        if (scmPropertyConfigurations.isEmpty()) {
+            return emptySet();
+        }
+
+        return scmMaterialConfigs.stream()
+                .filter(materialConfig -> scmPropertyConfigurations.stream().anyMatch(scm -> scm.getId().equals(materialConfig.getSCMConfig().getId())))
+                .collect(toSet());
     }
 }

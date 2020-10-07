@@ -342,7 +342,7 @@ class SCMExtensionConverterV2Test {
                 "\"provider\":\"Github\"," +
                 "\"event_type\":\"pull\"," +
                 "\"event_payload\":\"{\\\"action\\\":\\\"synchronize\\\",\\\"number\\\":1}\"," +
-                "\"materials\":[" +
+                "\"scm-configurations\":[" +
                 "{" +
                 "\"key-one\":{\"value\":\"value-one\"}," +
                 "\"key-two\":{\"value\":\"value-two\"}" +

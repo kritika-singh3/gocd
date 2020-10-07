@@ -18,6 +18,7 @@ package com.thoughtworks.go.plugin.access.scm.v1;
 
 import com.thoughtworks.go.plugin.access.DefaultPluginInteractionCallback;
 import com.thoughtworks.go.plugin.access.PluginRequestHelper;
+import com.thoughtworks.go.plugin.access.scm.SCMMaterial;
 import com.thoughtworks.go.plugin.access.scm.SCMPropertyConfiguration;
 import com.thoughtworks.go.plugin.access.scm.SCMView;
 import com.thoughtworks.go.plugin.access.scm.VersionedSCMExtension;
@@ -142,7 +143,7 @@ public class SCMExtensionV1 implements VersionedSCMExtension {
     }
 
     @Override
-    public List<SCMPropertyConfiguration> shouldUpdate(String pluginId, String provider, String eventType, String eventPayload, List<SCMPropertyConfiguration> materialsConfigured) {
+    public List<SCMMaterial> shouldUpdate(String pluginId, String provider, String eventType, String eventPayload, List<SCMMaterial> materialsConfigured) {
         throw new UnsupportedOperationException(format("Plugin: '%s' uses scm extension v1 and shouldUpdate calls are not supported by scm V1", pluginId));
     }
 }

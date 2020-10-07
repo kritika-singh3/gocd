@@ -18,6 +18,7 @@ package com.thoughtworks.go.server.materials;
 import com.thoughtworks.go.config.CruiseConfig;
 import com.thoughtworks.go.config.GoConfigWatchList;
 import com.thoughtworks.go.config.PipelineConfig;
+import com.thoughtworks.go.config.materials.PluggableSCMMaterialConfig;
 import com.thoughtworks.go.config.materials.dependency.DependencyMaterial;
 import com.thoughtworks.go.config.materials.git.GitMaterial;
 import com.thoughtworks.go.config.materials.svn.SvnMaterial;
@@ -36,6 +37,7 @@ import com.thoughtworks.go.server.service.GoConfigService;
 import com.thoughtworks.go.server.service.MaintenanceModeService;
 import com.thoughtworks.go.server.service.MaterialConfigConverter;
 import com.thoughtworks.go.server.service.SecretParamResolver;
+import com.thoughtworks.go.server.service.materials.PluggableScmService;
 import com.thoughtworks.go.server.service.result.HttpLocalizedOperationResult;
 import com.thoughtworks.go.serverhealth.HealthStateScope;
 import com.thoughtworks.go.serverhealth.HealthStateType;
@@ -57,6 +59,7 @@ import java.util.stream.Collectors;
 
 import static com.thoughtworks.go.serverhealth.HealthStateType.general;
 import static com.thoughtworks.go.serverhealth.ServerHealthState.warning;
+import static java.util.stream.Collectors.toSet;
 
 /**
  * @understands when to send requests to update a material on the database
@@ -71,6 +74,7 @@ public class MaterialUpdateService implements GoMessageListener<MaterialUpdateCo
     private final MaintenanceModeService maintenanceModeService;
     private final SecretParamResolver secretParamResolver;
     private final ExponentialBackoffService exponentialBackoffService;
+    private final PluggableScmService pluggableScmService;
     private final GoConfigWatchList watchList;
     private final GoConfigService goConfigService;
     private final SystemEnvironment systemEnvironment;
@@ -92,7 +96,8 @@ public class MaterialUpdateService implements GoMessageListener<MaterialUpdateCo
                                  ServerHealthService serverHealthService, PostCommitHookMaterialTypeResolver postCommitHookMaterialType,
                                  MDUPerformanceLogger mduPerformanceLogger, MaterialConfigConverter materialConfigConverter,
                                  DependencyMaterialUpdateQueue dependencyMaterialUpdateQueue, MaintenanceModeService maintenanceModeService,
-                                 SecretParamResolver secretParamResolver, ExponentialBackoffService exponentialBackoffService) {
+                                 SecretParamResolver secretParamResolver, ExponentialBackoffService exponentialBackoffService,
+                                 PluggableScmService pluggableScmService) {
         this.watchList = watchList;
         this.goConfigService = goConfigService;
         this.systemEnvironment = systemEnvironment;
@@ -106,6 +111,7 @@ public class MaterialUpdateService implements GoMessageListener<MaterialUpdateCo
         this.maintenanceModeService = maintenanceModeService;
         this.secretParamResolver = secretParamResolver;
         this.exponentialBackoffService = exponentialBackoffService;
+        this.pluggableScmService = pluggableScmService;
         completed.addListener(this);
     }
 
@@ -306,6 +312,27 @@ public class MaterialUpdateService implements GoMessageListener<MaterialUpdateCo
         this.materialUpdateCompleteListeners.add(materialUpdateCompleteListener);
     }
 
+    public boolean updateGitMaterial(String pluginId, String provider, String eventType, String payload) {
+        Set<MaterialConfig> schedulableMaterials = goConfigService.currentCruiseConfig().getAllUniquePostCommitSchedulableMaterials();
+
+        SCMPredicate predicate = new SCMPredicate(pluginId);
+        Set<PluggableSCMMaterialConfig> scmMaterialConfigs = schedulableMaterials.stream()
+                .filter(predicate)
+                .map(materialConfig -> (PluggableSCMMaterialConfig) materialConfig)
+                .collect(toSet());
+
+        if (scmMaterialConfigs.isEmpty()) {
+            return false;
+        }
+        Set<MaterialConfig> materialsToUpdate = pluggableScmService.getMaterialsToUpdate(pluginId, provider, eventType, payload, scmMaterialConfigs);
+        LOGGER.debug("Plugin send following materials to update: {}", materialsToUpdate);
+        Set<Material> materials = materialConfigConverter.toMaterials(materialsToUpdate);
+
+        materials.forEach(this::updateMaterial);
+
+        return !materials.isEmpty();
+    }
+
     private static class MaterialPredicate implements Predicate<Material> {
         private final String branchName;
         private final Set<String> possibleUrls;
@@ -320,6 +347,23 @@ public class MaterialUpdateService implements GoMessageListener<MaterialUpdateCo
             return material instanceof GitMaterial &&
                     ((GitMaterial) material).getBranch().equals(branchName) &&
                     possibleUrls.contains(((GitMaterial) material).getUrlArgument().withoutCredentials());
+        }
+    }
+
+    private static class SCMPredicate implements Predicate<MaterialConfig> {
+        private String pluginId;
+
+        public SCMPredicate(String pluginId) {
+            this.pluginId = pluginId;
+        }
+
+        @Override
+        public boolean test(MaterialConfig materialConfig) {
+            if (materialConfig instanceof PluggableSCMMaterialConfig) {
+                PluggableSCMMaterialConfig scm = (PluggableSCMMaterialConfig) materialConfig;
+                return scm.getPluginId().equals(this.pluginId);
+            }
+            return false;
         }
     }
 }

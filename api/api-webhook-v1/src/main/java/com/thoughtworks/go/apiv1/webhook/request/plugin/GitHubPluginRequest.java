@@ -30,6 +30,11 @@ public class GitHubPluginRequest extends WebhookRequest<GitHubPluginPayload> imp
 
     @Override
     public String[] allowedEvents() {
-        return new String[]{"push", "pull_request", "ping"};
+        return new String[]{};
+    }
+
+    @Override
+    public void validateEvents(String... allowedEvents) {
+        // don't validate any event - let the plugin make the decision
     }
 }

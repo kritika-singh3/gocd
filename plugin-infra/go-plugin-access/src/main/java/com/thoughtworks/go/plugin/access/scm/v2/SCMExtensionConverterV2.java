@@ -18,6 +18,7 @@ package com.thoughtworks.go.plugin.access.scm.v2;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.thoughtworks.go.plugin.access.common.handler.JSONResultMessageHandler;
+import com.thoughtworks.go.plugin.access.scm.SCMMaterial;
 import com.thoughtworks.go.plugin.access.scm.SCMProperty;
 import com.thoughtworks.go.plugin.access.scm.SCMPropertyConfiguration;
 import com.thoughtworks.go.plugin.access.scm.SCMView;
@@ -178,8 +179,15 @@ public class SCMExtensionConverterV2 {
         return capabilitiesConverterV2.fromDTO(capabilitiesDTO);
     }
 
-    public String requestMessageForShouldUpdate(String provider, String eventType, String eventPayload, List<SCMPropertyConfiguration> materialsConfigured) {
-        List<Map> materials = materialsConfigured.stream().map(jsonResultMessageHandler::configurationToMap).collect(toList());
+    public String requestMessageForShouldUpdate(String provider, String eventType, String eventPayload, List<SCMMaterial> materialsConfigured) {
+        List<Map> materials = materialsConfigured.stream()
+                .map((material) -> {
+                    LinkedHashMap<String, Object> map = new LinkedHashMap<>();
+                    map.put("id", material.getId());
+                    map.put("scm-configuration", jsonResultMessageHandler.configurationToMap(material.getPropertyConfiguration()));
+                    return map;
+                })
+                .collect(toList());
         LinkedHashMap map = new LinkedHashMap();
         map.put("provider", provider);
         map.put("event_type", eventType);
@@ -188,10 +196,10 @@ public class SCMExtensionConverterV2 {
         return toJsonString(map);
     }
 
-    public List<SCMPropertyConfiguration> responseMessageForShouldUpdate(String responseBody) {
+    public List<SCMMaterial> responseMessageForShouldUpdate(String responseBody) {
         try {
-            List<SCMPropertyConfiguration> scmConfigurations = new ArrayList<>();
-            List<Map<String, Map>> configurations;
+            List<SCMMaterial> scmConfigurations = new ArrayList<>();
+            List<Map<String, Object>> configurations;
             try {
                 configurations = (List) new GsonBuilder().create().fromJson(responseBody, Object.class);
             } catch (Exception e) {
@@ -200,7 +208,17 @@ public class SCMExtensionConverterV2 {
             if (configurations == null) {
                 throw new RuntimeException("Empty response body");
             }
-            configurations.forEach((config) -> scmConfigurations.add(getScmPropertyConfiguration(config)));
+            for (Map<String, Object> config : configurations) {
+                Map<String, Object> configMap = (Map<String, Object>) config.get("scm-configuration");
+                SCMPropertyConfiguration scmConfiguration = new SCMPropertyConfiguration();
+                for (String key : configMap.keySet()) {
+                    if (isEmpty(key)) {
+                        throw new RuntimeException("SCM configuration key cannot be empty");
+                    }
+                    scmConfiguration.add(new SCMProperty(key, configMap.get(key).toString()));
+                }
+                scmConfigurations.add(new SCMMaterial((String) config.get("id"), scmConfiguration));
+            }
             return scmConfigurations;
         } catch (Exception e) {
             throw new RuntimeException(format("Unable to de-serialize json response. %s", e.getMessage()));

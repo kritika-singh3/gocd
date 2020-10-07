@@ -42,5 +42,5 @@ public interface VersionedSCMExtension {
 
     Capabilities getCapabilities(String pluginId);
 
-    List<SCMPropertyConfiguration> shouldUpdate(String pluginId, String provider, String eventType, String eventPayload, List<SCMPropertyConfiguration> materialsConfigured);
+    List<SCMMaterial> shouldUpdate(String pluginId, String provider, String eventType, String eventPayload, List<SCMMaterial> materialsConfigured);
 }

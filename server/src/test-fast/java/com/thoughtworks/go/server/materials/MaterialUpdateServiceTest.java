@@ -15,7 +15,12 @@
  */
 package com.thoughtworks.go.server.materials;
 
-import com.thoughtworks.go.config.*;
+import com.thoughtworks.go.config.BasicCruiseConfig;
+import com.thoughtworks.go.config.CaseInsensitiveString;
+import com.thoughtworks.go.config.CruiseConfig;
+import com.thoughtworks.go.config.GoConfigWatchList;
+import com.thoughtworks.go.config.materials.PluggableSCMMaterial;
+import com.thoughtworks.go.config.materials.PluggableSCMMaterialConfig;
 import com.thoughtworks.go.config.materials.ScmMaterial;
 import com.thoughtworks.go.config.materials.dependency.DependencyMaterial;
 import com.thoughtworks.go.config.materials.git.GitMaterial;
@@ -36,6 +41,7 @@ import com.thoughtworks.go.server.service.GoConfigService;
 import com.thoughtworks.go.server.service.MaintenanceModeService;
 import com.thoughtworks.go.server.service.MaterialConfigConverter;
 import com.thoughtworks.go.server.service.SecretParamResolver;
+import com.thoughtworks.go.server.service.materials.PluggableScmService;
 import com.thoughtworks.go.server.service.result.HttpLocalizedOperationResult;
 import com.thoughtworks.go.serverhealth.HealthStateScope;
 import com.thoughtworks.go.serverhealth.HealthStateType;
@@ -62,6 +68,7 @@ import static com.thoughtworks.go.helper.MaterialsMother.gitMaterial;
 import static com.thoughtworks.go.server.materials.BackOffResult.DENY;
 import static com.thoughtworks.go.server.materials.BackOffResult.PERMIT;
 import static java.util.Arrays.asList;
+import static java.util.Collections.singleton;
 import static java.util.stream.Collectors.toSet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
@@ -102,6 +109,8 @@ public class MaterialUpdateServiceTest {
     private MDUPerformanceLogger mduPerformanceLogger;
     @Mock
     private ExponentialBackoffService exponentialBackoffService;
+    @Mock
+    private PluggableScmService pluggableScmService;
 
     private static final SvnMaterialConfig MATERIAL_CONFIG = MaterialConfigsMother.svnMaterialConfig();
     private Username username;
@@ -115,14 +124,14 @@ public class MaterialUpdateServiceTest {
         initMocks(this);
         service = new MaterialUpdateService(queue, configQueue, completed, watchList, goConfigService, systemEnvironment,
                 serverHealthService, postCommitHookMaterialType, mduPerformanceLogger, materialConfigConverter,
-                dependencyMaterialUpdateQueue, maintenanceModeService, secretParamResolver, exponentialBackoffService);
+                dependencyMaterialUpdateQueue, maintenanceModeService, secretParamResolver, exponentialBackoffService, pluggableScmService);
 
         service.registerMaterialSources(scmMaterialSource);
         service.registerMaterialUpdateCompleteListener(scmMaterialSource);
         service.registerMaterialUpdateCompleteListener(dependencyMaterialUpdateNotifier);
 
-        HashSet<MaterialConfig> materialConfigs = new HashSet(Collections.singleton(MATERIAL_CONFIG));
-        HashSet<Material> materials = new HashSet(Collections.singleton(svnMaterial));
+        Set<MaterialConfig> materialConfigs = singleton(MATERIAL_CONFIG);
+        Set<Material> materials = singleton(svnMaterial);
         when(goConfigService.getSchedulableMaterials()).thenReturn(materialConfigs);
         when(materialConfigConverter.toMaterials(materialConfigs)).thenReturn(materials);
         username = new Username(new CaseInsensitiveString("loser"));
@@ -518,5 +527,37 @@ public class MaterialUpdateServiceTest {
         }
         Map<Material, Date> inProgress = (Map<Material, Date>) ReflectionUtil.getField(service, "inProgress");
         assertThat(inProgress.containsKey(svnMaterial)).isFalse();
+    }
+
+    @Nested
+    class UpdateGitMaterial {
+        @Test
+        void shouldReturnFalseIfNoPluggableScmMaterialsDefined() {
+            CruiseConfig cruiseConfig = mock(CruiseConfig.class);
+            when(goConfigService.currentCruiseConfig()).thenReturn(cruiseConfig);
+            when(cruiseConfig.getAllUniquePostCommitSchedulableMaterials()).thenReturn(singleton(MATERIAL_CONFIG));
+
+            assertThat(service.updateGitMaterial("plugin-id", "Github", "pull_request", "some-payload")).isFalse();
+            verifyNoInteractions(pluggableScmService);
+            verifyNoInteractions(materialConfigConverter);
+        }
+
+        @Test
+        void shouldPassTheEventAttributesAsIsToThePluggableService() {
+            PluggableSCMMaterial scmMaterial = MaterialsMother.pluggableSCMMaterial();
+            MaterialConfig materialConfig = scmMaterial.config();
+            String pluginId = scmMaterial.getPluginId();
+            CruiseConfig cruiseConfig = mock(CruiseConfig.class);
+
+            when(goConfigService.currentCruiseConfig()).thenReturn(cruiseConfig);
+            Set<MaterialConfig> materialConfigs = singleton(materialConfig);
+            when(cruiseConfig.getAllUniquePostCommitSchedulableMaterials()).thenReturn(materialConfigs);
+            when(pluggableScmService.getMaterialsToUpdate(anyString(), anyString(), anyString(), anyString(), anySet())).thenReturn(materialConfigs);
+            when(materialConfigConverter.toMaterials(materialConfigs)).thenReturn(singleton(scmMaterial));
+
+            assertThat(service.updateGitMaterial(pluginId, "Github", "pull_request", "some-payload")).isTrue();
+            verify(pluggableScmService).getMaterialsToUpdate(pluginId, "Github", "pull_request", "some-payload", singleton((PluggableSCMMaterialConfig) materialConfig));
+            verify(materialConfigConverter).toMaterials(materialConfigs);
+        }
     }
 }
